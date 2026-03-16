@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,7 @@ import 'health_records_screen.dart';
 import 'appointments_screen.dart';
 import 'lab_test_screen.dart';
 import 'doctor_requests_screen.dart';
+import 'ambulance_map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,9 +24,16 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   static const Color _primary = Color(0xFF00C896);
-  static const Color _bg = Color(0xFF0D1117);
-  static const Color _card = Color(0xFF161B27);
+  static const Color _bg     = Color(0xFF0D1117);
+  static const Color _card   = Color(0xFF161B27);
   static const Color _border = Color(0xFF1E2A42);
+  static const Color _red    = Color(0xFFFF3B30);
+
+  // SOS hold state
+  bool   _sosPressing  = false;
+  double _sosProgress  = 0.0;
+  int    _sosCountdown = 3;
+  Timer? _sosTimer;
 
   final List<Widget> _screens = const [
     _HomeTab(),
@@ -33,44 +42,292 @@ class _HomeScreenState extends State<HomeScreen> {
     HealthRecordsScreen(),
   ];
 
+  void _onSosPressStart() {
+    setState(() {
+      _sosPressing  = true;
+      _sosProgress  = 0.0;
+      _sosCountdown = 3;
+    });
+    HapticFeedback.heavyImpact();
+
+    int ticks = 0;
+    _sosTimer = Timer.periodic(
+        const Duration(milliseconds: 50), (timer) {
+      ticks++;
+      setState(() {
+        _sosProgress  = ticks / 60;
+        _sosCountdown = 3 - (ticks / 20).floor();
+        if (_sosCountdown < 1) _sosCountdown = 1;
+      });
+      if (ticks % 20 == 0) HapticFeedback.mediumImpact();
+      if (ticks >= 60) {
+        timer.cancel();
+        setState(() {
+          _sosPressing  = false;
+          _sosProgress  = 0.0;
+          _sosCountdown = 3;
+        });
+        HapticFeedback.heavyImpact();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const AmbulanceMapScreen()),
+        );
+      }
+    });
+  }
+
+  void _onSosPressEnd() {
+    _sosTimer?.cancel();
+    setState(() {
+      _sosPressing  = false;
+      _sosProgress  = 0.0;
+      _sosCountdown = 3;
+    });
+  }
+
+  @override
+  void dispose() {
+    _sosTimer?.cancel();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      body: _screens[_currentIndex],
+      body: Stack(
+        children: [
+          // ── Main screen content ──────────────────
+          _screens[_currentIndex],
+
+          // ── SOS countdown overlay ────────────────
+          if (_sosPressing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.82),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width:  160,
+                      height: 160,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer glow ring
+                          Container(
+                            width:  160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: _red.withOpacity(0.2),
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          // Progress ring
+                          SizedBox(
+                            width:  140,
+                            height: 140,
+                            child: CircularProgressIndicator(
+                              value:      _sosProgress,
+                              strokeWidth: 7,
+                              backgroundColor:
+                                  _red.withOpacity(0.15),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(
+                                      _red),
+                            ),
+                          ),
+                          // Countdown number
+                          Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '$_sosCountdown',
+                                style: GoogleFonts.poppins(
+                                  color:      _red,
+                                  fontSize:   64,
+                                  fontWeight: FontWeight.w900,
+                                  height:     1,
+                                ),
+                              ),
+                              Text(
+                                'sec',
+                                style: GoogleFonts.poppins(
+                                  color:    _red.withOpacity(0.7),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      '🚨 Sending SOS...',
+                      style: GoogleFonts.poppins(
+                        color:      _red,
+                        fontSize:   22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Release to cancel',
+                      style: GoogleFonts.poppins(
+                        color:    Colors.white54,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    // Cancel button
+                    GestureDetector(
+                      onTap: _onSosPressEnd,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 28, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Colors.white24),
+                          borderRadius:
+                              BorderRadius.circular(30),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            color:    Colors.white54,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: _card,
-          border: Border(top: BorderSide(color: _border, width: 1)),
+          border:
+              Border(top: BorderSide(color: _border, width: 1)),
         ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          backgroundColor: Colors.transparent,
-          selectedItemColor: _primary,
-          unselectedItemColor: const Color(0xFF4A5568),
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          selectedLabelStyle: GoogleFonts.poppins(
-              fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
-          items: const [
-            BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home_rounded),
-                label: 'Home'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.medical_services_outlined),
-                activeIcon: Icon(Icons.medical_services_rounded),
-                label: 'Doctors'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.local_pharmacy_outlined),
-                activeIcon: Icon(Icons.local_pharmacy_rounded),
-                label: 'Pharmacy'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.folder_outlined),
-                activeIcon: Icon(Icons.folder_rounded),
-                label: 'Records'),
+        child: Row(
+          children: [
+            // ── Left 2 tabs ──────────────────────────
+            Expanded(
+              child: BottomNavigationBar(
+                currentIndex:
+                    _currentIndex < 2 ? _currentIndex : 0,
+                onTap: (i) =>
+                    setState(() => _currentIndex = i),
+                backgroundColor: Colors.transparent,
+                selectedItemColor: _primary,
+                unselectedItemColor: const Color(0xFF4A5568),
+                type: BottomNavigationBarType.fixed,
+                elevation: 0,
+                selectedLabelStyle: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+                unselectedLabelStyle:
+                    GoogleFonts.poppins(fontSize: 11),
+                items: const [
+                  BottomNavigationBarItem(
+                      icon: Icon(Icons.home_outlined),
+                      activeIcon: Icon(Icons.home_rounded),
+                      label: 'Home'),
+                  BottomNavigationBarItem(
+                      icon: Icon(
+                          Icons.medical_services_outlined),
+                      activeIcon: Icon(
+                          Icons.medical_services_rounded),
+                      label: 'Doctors'),
+                ],
+              ),
+            ),
+
+            // ── SOS Button ───────────────────────────
+            GestureDetector(
+              onTapDown: (_) => _onSosPressStart(),
+              onTapUp:   (_) => _onSosPressEnd(),
+              onTapCancel:   _onSosPressEnd,
+              child: Container(
+                margin: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 8),
+                width:  64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _red,
+                  boxShadow: [
+                    BoxShadow(
+                      color:      _red.withOpacity(0.5),
+                      blurRadius: 18,
+                      spreadRadius: 3,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                        Icons.local_hospital_rounded,
+                        color: Colors.white,
+                        size: 24),
+                    Text(
+                      'SOS',
+                      style: GoogleFonts.poppins(
+                        color:      Colors.white,
+                        fontSize:   10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Right 2 tabs ─────────────────────────
+            Expanded(
+              child: BottomNavigationBar(
+                currentIndex: _currentIndex >= 2
+                    ? _currentIndex - 2
+                    : 0,
+                onTap: (i) =>
+                    setState(() => _currentIndex = i + 2),
+                backgroundColor: Colors.transparent,
+                selectedItemColor: _primary,
+                unselectedItemColor: const Color(0xFF4A5568),
+                type: BottomNavigationBarType.fixed,
+                elevation: 0,
+                selectedLabelStyle: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600),
+                unselectedLabelStyle:
+                    GoogleFonts.poppins(fontSize: 11),
+                items: const [
+                  BottomNavigationBarItem(
+                      icon: Icon(
+                          Icons.local_pharmacy_outlined),
+                      activeIcon: Icon(
+                          Icons.local_pharmacy_rounded),
+                      label: 'Pharmacy'),
+                  BottomNavigationBarItem(
+                      icon: Icon(Icons.folder_outlined),
+                      activeIcon:
+                          Icon(Icons.folder_rounded),
+                      label: 'Records'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -93,66 +350,68 @@ class _HomeTabState extends State<_HomeTab> {
 
   final List<Map<String, dynamic>> _healthFacts = [
     {
-      'icon': '💧',
-      'fact': 'Drink 8 glasses of water daily to stay hydrated and boost energy.',
+      'icon':  '💧',
+      'fact':  'Drink 8 glasses of water daily to stay hydrated and boost energy.',
       'color': Color(0xFF2196F3),
     },
     {
-      'icon': '🏃',
-      'fact': '30 minutes of walking daily reduces heart disease risk by 35%.',
+      'icon':  '🏃',
+      'fact':  '30 minutes of walking daily reduces heart disease risk by 35%.',
       'color': Color(0xFF00C896),
     },
     {
-      'icon': '😴',
-      'fact': '7–9 hours of sleep strengthens your immune system significantly.',
+      'icon':  '😴',
+      'fact':  '7–9 hours of sleep strengthens your immune system significantly.',
       'color': Color(0xFF6C63FF),
     },
     {
-      'icon': '🥦',
-      'fact': 'Eating colorful vegetables daily provides essential antioxidants.',
+      'icon':  '🥦',
+      'fact':  'Eating colorful vegetables daily provides essential antioxidants.',
       'color': Color(0xFF4CAF50),
     },
     {
-      'icon': '🧘',
-      'fact': '10 minutes of meditation daily reduces stress and anxiety by 40%.',
+      'icon':  '🧘',
+      'fact':  '10 minutes of meditation daily reduces stress and anxiety by 40%.',
       'color': Color(0xFFFFB347),
     },
     {
-      'icon': '❤️',
-      'fact': 'Laughing 15 minutes a day improves blood flow and heart health.',
+      'icon':  '❤️',
+      'fact':  'Laughing 15 minutes a day improves blood flow and heart health.',
       'color': Color(0xFFFF6B6B),
     },
     {
-      'icon': '🌞',
-      'fact': '15 minutes of morning sunlight boosts vitamin D and mood.',
+      'icon':  '🌞',
+      'fact':  '15 minutes of morning sunlight boosts vitamin D and mood.',
       'color': Color(0xFFFFD700),
     },
   ];
 
-  int _factIndex = 0;
+  int    _factIndex   = 0;
   double _factOpacity = 1.0;
   Timer? _factTimer;
 
   static const Color _primary = Color(0xFF00C896);
-  static const Color _bg = Color(0xFF0D1117);
-  static const Color _card = Color(0xFF161B27);
-  static const Color _border = Color(0xFF1E2A42);
-  static const Color _text2 = Color(0xFF8B9EC7);
+  static const Color _bg      = Color(0xFF0D1117);
+  static const Color _card    = Color(0xFF161B27);
+  static const Color _border  = Color(0xFF1E2A42);
+  static const Color _text2   = Color(0xFF8B9EC7);
 
   @override
   void initState() {
     super.initState();
-    _apptStream = _svc.listenToMyAppointments();
-    _labStream = _svc.listenToMyLabTests();
+    _apptStream     = _svc.listenToMyAppointments();
+    _labStream      = _svc.listenToMyLabTests();
     _requestsStream = _svc.listenToDoctorRequests();
     _startFactRotation();
   }
 
   void _startFactRotation() {
-    _factTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _factTimer =
+        Timer.periodic(const Duration(seconds: 5), (_) async {
       setState(() => _factOpacity = 0.0);
       await Future.delayed(const Duration(milliseconds: 400));
-      setState(() => _factIndex = (_factIndex + 1) % _healthFacts.length);
+      setState(
+          () => _factIndex = (_factIndex + 1) % _healthFacts.length);
       setState(() => _factOpacity = 1.0);
     });
   }
@@ -165,12 +424,12 @@ class _HomeTabState extends State<_HomeTab> {
 
   void _showProfilePopup(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? 'Patient';
+    final name  = user?.displayName ?? 'Patient';
     final email = user?.email ?? '';
 
     showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
+      context:          context,
+      backgroundColor:  Colors.transparent,
       isScrollControlled: true,
       builder: (_) => Container(
         decoration: const BoxDecoration(
@@ -178,23 +437,24 @@ class _HomeTabState extends State<_HomeTab> {
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(24)),
           border: Border(
-              top: BorderSide(color: Color(0xFF1E2A42), width: 1)),
+              top: BorderSide(
+                  color: Color(0xFF1E2A42), width: 1)),
         ),
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 40,
+              width:  40,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFF1E2A42),
+                color:        const Color(0xFF1E2A42),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 24),
             Container(
-              width: 80,
+              width:  80,
               height: 80,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -203,13 +463,13 @@ class _HomeTabState extends State<_HomeTab> {
                     const Color(0xFF6C63FF).withOpacity(0.8),
                   ],
                   begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  end:   Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: _primary.withOpacity(0.3),
-                    blurRadius: 20,
+                    color:       _primary.withOpacity(0.3),
+                    blurRadius:  20,
                     spreadRadius: 2,
                   ),
                 ],
@@ -218,8 +478,8 @@ class _HomeTabState extends State<_HomeTab> {
                 child: Text(
                   name.isNotEmpty ? name[0].toUpperCase() : 'P',
                   style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 32,
+                      color:      Colors.white,
+                      fontSize:   32,
                       fontWeight: FontWeight.w700),
                 ),
               ),
@@ -227,22 +487,22 @@ class _HomeTabState extends State<_HomeTab> {
             const SizedBox(height: 16),
             Text(name,
                 style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 20,
+                    color:      Colors.white,
+                    fontSize:   20,
                     fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
             Text(email,
-                style:
-                    GoogleFonts.poppins(color: _text2, fontSize: 13)),
+                style: GoogleFonts.poppins(
+                    color: _text2, fontSize: 13)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: _primary.withOpacity(0.1),
+                color:  _primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: _primary.withOpacity(0.3)),
+                border: Border.all(
+                    color: _primary.withOpacity(0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -252,25 +512,25 @@ class _HomeTabState extends State<_HomeTab> {
                   const SizedBox(width: 6),
                   Text('Patient',
                       style: GoogleFonts.poppins(
-                          color: _primary,
-                          fontSize: 12,
+                          color:      _primary,
+                          fontSize:   12,
                           fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
             const SizedBox(height: 28),
             _ProfileInfoRow(
-                icon: Icons.person_outline_rounded,
+                icon:  Icons.person_outline_rounded,
                 label: 'Full Name',
                 value: name),
             const SizedBox(height: 12),
             _ProfileInfoRow(
-                icon: Icons.email_outlined,
+                icon:  Icons.email_outlined,
                 label: 'Email',
                 value: email),
             const SizedBox(height: 12),
             _ProfileInfoRow(
-                icon: Icons.shield_outlined,
+                icon:  Icons.shield_outlined,
                 label: 'Account Type',
                 value: 'Patient Account'),
             const SizedBox(height: 28),
@@ -282,22 +542,24 @@ class _HomeTabState extends State<_HomeTab> {
                       const Color(0xFFFF4757).withOpacity(0.15),
                   foregroundColor: const Color(0xFFFF4757),
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: BorderSide(
-                        color:
-                            const Color(0xFFFF4757).withOpacity(0.3)),
+                        color: const Color(0xFFFF4757)
+                            .withOpacity(0.3)),
                   ),
                 ),
                 onPressed: () async {
                   Navigator.pop(context);
                   await _svc.signOut();
                 },
-                icon: const Icon(Icons.logout_rounded, size: 18),
+                icon: const Icon(Icons.logout_rounded,
+                    size: 18),
                 label: Text('Log Out',
                     style: GoogleFonts.poppins(
-                        fontSize: 15,
+                        fontSize:   15,
                         fontWeight: FontWeight.w600)),
               ),
             ),
@@ -310,48 +572,51 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? 'Patient';
+    final user  = FirebaseAuth.instance.currentUser;
+    final name  = user?.displayName ?? 'Patient';
     final currentFact = _healthFacts[_factIndex];
 
     return Scaffold(
       backgroundColor: _bg,
       body: Stack(
         children: [
-          // ── Decorative health background ────────────
+          // ── Decorative background ──────────────
           Positioned.fill(
             child: CustomPaint(
               painter: _HealthBgPainter(),
             ),
           ),
-          // ── Main content ────────────────────────────
+          // ── Main content ───────────────────────
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ────────────────────────────
+                  // ── Header ──────────────────────
                   Row(
                     children: [
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
                           Text('Hello, $name 👋',
                               style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 22,
+                                  color:      Colors.white,
+                                  fontSize:   22,
                                   fontWeight: FontWeight.w700)),
                           Text('How are you feeling today?',
                               style: GoogleFonts.poppins(
-                                  color: _text2, fontSize: 14)),
+                                  color:    _text2,
+                                  fontSize: 14)),
                         ],
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: () => _showProfilePopup(context),
+                        onTap: () =>
+                            _showProfilePopup(context),
                         child: Container(
-                          width: 44,
+                          width:  44,
                           height: 44,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -361,12 +626,13 @@ class _HomeTabState extends State<_HomeTab> {
                                     .withOpacity(0.7),
                               ],
                               begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                              end:   Alignment.bottomRight,
                             ),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: _primary.withOpacity(0.25),
+                                color:      _primary
+                                    .withOpacity(0.25),
                                 blurRadius: 10,
                                 spreadRadius: 1,
                               ),
@@ -378,9 +644,9 @@ class _HomeTabState extends State<_HomeTab> {
                                   ? name[0].toUpperCase()
                                   : 'P',
                               style: GoogleFonts.poppins(
-                                  color: Colors.white,
+                                  color:      Colors.white,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 18),
+                                  fontSize:   18),
                             ),
                           ),
                         ),
@@ -389,12 +655,13 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Health Fact Card ─────────────────
+                  // ── Health Fact Card ─────────────
                   AnimatedOpacity(
-                    opacity: _factOpacity,
-                    duration: const Duration(milliseconds: 400),
+                    opacity:  _factOpacity,
+                    duration: const Duration(
+                        milliseconds: 400),
                     child: Container(
-                      width: double.infinity,
+                      width:   double.infinity,
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -405,28 +672,33 @@ class _HomeTabState extends State<_HomeTab> {
                                 .withOpacity(0.05),
                           ],
                           begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                          end:   Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius:
+                            BorderRadius.circular(18),
                         border: Border.all(
-                          color: (currentFact['color'] as Color)
-                              .withOpacity(0.3),
+                          color:
+                              (currentFact['color'] as Color)
+                                  .withOpacity(0.3),
                         ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            width: 52,
+                            width:  52,
                             height: 52,
                             decoration: BoxDecoration(
-                              color: (currentFact['color'] as Color)
-                                  .withOpacity(0.15),
+                              color:
+                                  (currentFact['color']
+                                          as Color)
+                                      .withOpacity(0.15),
                               borderRadius:
                                   BorderRadius.circular(14),
                             ),
                             child: Center(
                               child: Text(
-                                currentFact['icon'] as String,
+                                currentFact['icon']
+                                    as String,
                                 style: const TextStyle(
                                   fontSize: 26,
                                   fontFamilyFallback: [
@@ -446,19 +718,21 @@ class _HomeTabState extends State<_HomeTab> {
                               children: [
                                 Text('Health Tip 💡',
                                     style: GoogleFonts.poppins(
-                                        color: currentFact['color']
-                                            as Color,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
+                                        color: currentFact[
+                                            'color'] as Color,
+                                        fontSize:    11,
+                                        fontWeight:
+                                            FontWeight.w600,
                                         letterSpacing: 0.5)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  currentFact['fact'] as String,
+                                  currentFact['fact']
+                                      as String,
                                   style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: 13,
+                                      color:      Colors.white,
+                                      fontSize:   13,
                                       fontWeight: FontWeight.w500,
-                                      height: 1.4),
+                                      height:     1.4),
                                 ),
                               ],
                             ),
@@ -469,7 +743,7 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Doctor Requests Banner ───────────
+                  // ── Doctor Requests Banner ───────
                   StreamBuilder<QuerySnapshot>(
                     stream: _requestsStream,
                     builder: (context, snapshot) {
@@ -481,11 +755,11 @@ class _HomeTabState extends State<_HomeTab> {
                         onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    const DoctorRequestsScreen())),
+                                builder: (_) => const
+                                    DoctorRequestsScreen())),
                         child: Container(
-                          margin:
-                              const EdgeInsets.only(bottom: 20),
+                          margin: const EdgeInsets.only(
+                              bottom: 20),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: const Color(0xFF6C63FF)
@@ -498,16 +772,18 @@ class _HomeTabState extends State<_HomeTab> {
                           ),
                           child: Row(children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding:
+                                  const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF6C63FF)
-                                    .withOpacity(0.15),
+                                color:
+                                    const Color(0xFF6C63FF)
+                                        .withOpacity(0.15),
                                 borderRadius:
                                     BorderRadius.circular(12),
                               ),
                               child: const Text('📋',
-                                  style:
-                                      TextStyle(fontSize: 22)),
+                                  style: TextStyle(
+                                      fontSize: 22)),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -519,13 +795,14 @@ class _HomeTabState extends State<_HomeTab> {
                                     '$count Doctor Request${count > 1 ? 's' : ''} Pending',
                                     style: GoogleFonts.poppins(
                                         color: Colors.white,
-                                        fontSize: 14,
+                                        fontSize:   14,
                                         fontWeight:
                                             FontWeight.w700),
                                   ),
-                                  Text('Tap to view & confirm',
+                                  Text(
+                                      'Tap to view & confirm',
                                       style: GoogleFonts.poppins(
-                                          color: _text2,
+                                          color:    _text2,
                                           fontSize: 12)),
                                 ],
                               ),
@@ -539,11 +816,11 @@ class _HomeTabState extends State<_HomeTab> {
                     },
                   ),
 
-                  // ── Quick Actions ────────────────────
+                  // ── Quick Actions ────────────────
                   Text('Quick Actions',
                       style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 16,
+                          color:      Colors.white,
+                          fontSize:   16,
                           fontWeight: FontWeight.w600)),
                   const SizedBox(height: 14),
                   Column(
@@ -551,11 +828,11 @@ class _HomeTabState extends State<_HomeTab> {
                       Row(children: [
                         Expanded(
                           child: _QuickAction(
-                            icon: Icons.smart_toy_outlined,
-                            label: 'MediBot',
+                            icon:     Icons.smart_toy_outlined,
+                            label:    'MediBot',
                             subtitle: 'AI Symptom Checker',
-                            color: const Color(0xFF6C63FF),
-                            emoji: '🤖',
+                            color:    const Color(0xFF6C63FF),
+                            emoji:    '🤖',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -566,12 +843,11 @@ class _HomeTabState extends State<_HomeTab> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _QuickAction(
-                            icon:
-                                Icons.medical_services_outlined,
-                            label: 'Find Doctor',
+                            icon: Icons.medical_services_outlined,
+                            label:    'Find Doctor',
                             subtitle: 'Book appointment',
-                            color: const Color(0xFF00C896),
-                            emoji: '👨‍⚕️',
+                            color:    const Color(0xFF00C896),
+                            emoji:    '👨‍⚕️',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -584,11 +860,12 @@ class _HomeTabState extends State<_HomeTab> {
                       Row(children: [
                         Expanded(
                           child: _QuickAction(
-                            icon: Icons.local_pharmacy_outlined,
-                            label: 'Pharmacy',
+                            icon:
+                                Icons.local_pharmacy_outlined,
+                            label:    'Pharmacy',
                             subtitle: 'Order medicines',
-                            color: const Color(0xFFFF6B6B),
-                            emoji: '💊',
+                            color:    const Color(0xFFFF6B6B),
+                            emoji:    '💊',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -599,11 +876,11 @@ class _HomeTabState extends State<_HomeTab> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _QuickAction(
-                            icon: Icons.science_outlined,
-                            label: 'Lab Tests',
+                            icon:     Icons.science_outlined,
+                            label:    'Lab Tests',
                             subtitle: 'Book a test',
-                            color: const Color(0xFFFFB347),
-                            emoji: '🧪',
+                            color:    const Color(0xFFFFB347),
+                            emoji:    '🧪',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -616,11 +893,12 @@ class _HomeTabState extends State<_HomeTab> {
                       Row(children: [
                         Expanded(
                           child: _QuickAction(
-                            icon: Icons.calendar_today_outlined,
-                            label: 'Appointments',
+                            icon:
+                                Icons.calendar_today_outlined,
+                            label:    'Appointments',
                             subtitle: 'My bookings',
-                            color: const Color(0xFF2196F3),
-                            emoji: '📅',
+                            color:    const Color(0xFF2196F3),
+                            emoji:    '📅',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -631,11 +909,11 @@ class _HomeTabState extends State<_HomeTab> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _QuickAction(
-                            icon: Icons.folder_outlined,
-                            label: 'Records',
+                            icon:     Icons.folder_outlined,
+                            label:    'Records',
                             subtitle: 'Health history',
-                            color: const Color(0xFF00BCD4),
-                            emoji: '📋',
+                            color:    const Color(0xFF00BCD4),
+                            emoji:    '📋',
                             onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -648,25 +926,26 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                   const SizedBox(height: 28),
 
-                  // ── My Appointments ──────────────────
+                  // ── My Appointments ──────────────
                   Row(
                     mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
                     children: [
                       Text('My Appointments',
                           style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 16,
+                              color:      Colors.white,
+                              fontSize:   16,
                               fontWeight: FontWeight.w600)),
                       TextButton(
                         onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) =>
-                                    const AppointmentsScreen())),
+                                builder: (_) => const
+                                    AppointmentsScreen())),
                         child: Text('View All',
                             style: GoogleFonts.poppins(
-                                color: _primary, fontSize: 13)),
+                                color:    _primary,
+                                fontSize: 13)),
                       ),
                     ],
                   ),
@@ -677,16 +956,16 @@ class _HomeTabState extends State<_HomeTab> {
                       if (!snapshot.hasData ||
                           snapshot.data!.docs.isEmpty) {
                         return _EmptyCard(
-                            icon: '📅',
+                            icon:    '📅',
                             message: 'No appointments yet');
                       }
                       final docs =
                           snapshot.data!.docs.toList()
                             ..sort((a, b) {
-                              final at =
-                                  (a.data() as Map)['createdAt'];
-                              final bt =
-                                  (b.data() as Map)['createdAt'];
+                              final at = (a.data()
+                                  as Map)['createdAt'];
+                              final bt = (b.data()
+                                  as Map)['createdAt'];
                               if (at == null) return 1;
                               if (bt == null) return -1;
                               return (bt as Timestamp)
@@ -704,15 +983,15 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ── My Lab Tests ─────────────────────
+                  // ── My Lab Tests ─────────────────
                   Row(
                     mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
                     children: [
                       Text('My Lab Tests',
                           style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 16,
+                              color:      Colors.white,
+                              fontSize:   16,
                               fontWeight: FontWeight.w600)),
                       TextButton(
                         onPressed: () => Navigator.push(
@@ -722,7 +1001,8 @@ class _HomeTabState extends State<_HomeTab> {
                                     const LabTestScreen())),
                         child: Text('Book New',
                             style: GoogleFonts.poppins(
-                                color: _primary, fontSize: 13)),
+                                color:    _primary,
+                                fontSize: 13)),
                       ),
                     ],
                   ),
@@ -733,16 +1013,16 @@ class _HomeTabState extends State<_HomeTab> {
                       if (!snapshot.hasData ||
                           snapshot.data!.docs.isEmpty) {
                         return _EmptyCard(
-                            icon: '🧪',
+                            icon:    '🧪',
                             message: 'No lab tests booked yet');
                       }
                       final docs =
                           snapshot.data!.docs.toList()
                             ..sort((a, b) {
-                              final at =
-                                  (a.data() as Map)['createdAt'];
-                              final bt =
-                                  (b.data() as Map)['createdAt'];
+                              final at = (a.data()
+                                  as Map)['createdAt'];
+                              final bt = (b.data()
+                                  as Map)['createdAt'];
                               if (at == null) return 1;
                               if (bt == null) return -1;
                               return (bt as Timestamp)
@@ -769,18 +1049,20 @@ class _HomeTabState extends State<_HomeTab> {
                               color: _card,
                               borderRadius:
                                   BorderRadius.circular(14),
-                              border:
-                                  Border.all(color: _border),
+                              border: Border.all(
+                                  color: _border),
                             ),
                             child: Row(children: [
                               Container(
                                 padding:
                                     const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFB347)
+                                  color: const Color(
+                                          0xFFFFB347)
                                       .withOpacity(0.1),
                                   borderRadius:
-                                      BorderRadius.circular(12),
+                                      BorderRadius.circular(
+                                          12),
                                 ),
                                 child: const Text('🧪',
                                     style: TextStyle(
@@ -790,13 +1072,14 @@ class _HomeTabState extends State<_HomeTab> {
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                      CrossAxisAlignment
+                                          .start,
                                   children: [
                                     Text(tests,
-                                        style:
-                                            GoogleFonts.poppins(
-                                                color:
-                                                    Colors.white,
+                                        style: GoogleFonts
+                                            .poppins(
+                                                color: Colors
+                                                    .white,
                                                 fontSize: 13,
                                                 fontWeight:
                                                     FontWeight
@@ -805,28 +1088,29 @@ class _HomeTabState extends State<_HomeTab> {
                                         overflow: TextOverflow
                                             .ellipsis),
                                     Text(d['lab'] ?? '',
-                                        style:
-                                            GoogleFonts.poppins(
+                                        style: GoogleFonts
+                                            .poppins(
                                                 color: _text2,
                                                 fontSize: 12)),
                                   ],
                                 ),
                               ),
                               Container(
-                                padding:
-                                    const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4),
+                                padding: const EdgeInsets
+                                    .symmetric(
+                                    horizontal: 10,
+                                    vertical:   4),
                                 decoration: BoxDecoration(
                                   color:
                                       sc.withOpacity(0.15),
                                   borderRadius:
-                                      BorderRadius.circular(20),
+                                      BorderRadius.circular(
+                                          20),
                                 ),
                                 child: Text(status,
                                     style: GoogleFonts.poppins(
-                                        color: sc,
-                                        fontSize: 11,
+                                        color:      sc,
+                                        fontSize:   11,
                                         fontWeight:
                                             FontWeight.w600)),
                               ),
@@ -851,7 +1135,6 @@ class _HomeTabState extends State<_HomeTab> {
 class _HealthBgPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // Radial glow — top right teal
     final g1 = Paint()
       ..shader = RadialGradient(colors: [
         const Color(0xFF00C896).withOpacity(0.13),
@@ -862,10 +1145,8 @@ class _HealthBgPainter extends CustomPainter {
       ));
     canvas.drawCircle(
         Offset(size.width * 0.85, size.height * 0.08),
-        size.width * 0.5,
-        g1);
+        size.width * 0.5, g1);
 
-    // Radial glow — bottom left purple
     final g2 = Paint()
       ..shader = RadialGradient(colors: [
         const Color(0xFF6C63FF).withOpacity(0.11),
@@ -876,10 +1157,8 @@ class _HealthBgPainter extends CustomPainter {
       ));
     canvas.drawCircle(
         Offset(size.width * 0.1, size.height * 0.75),
-        size.width * 0.5,
-        g2);
+        size.width * 0.5, g2);
 
-    // Radial glow — center blue
     final g3 = Paint()
       ..shader = RadialGradient(colors: [
         const Color(0xFF2196F3).withOpacity(0.07),
@@ -890,22 +1169,20 @@ class _HealthBgPainter extends CustomPainter {
       ));
     canvas.drawCircle(
         Offset(size.width * 0.5, size.height * 0.45),
-        size.width * 0.6,
-        g3);
+        size.width * 0.6, g3);
 
-    // Heartbeat ECG line
     final ecgPaint = Paint()
-      ..color = const Color(0xFF00C896).withOpacity(0.07)
-      ..style = PaintingStyle.stroke
+      ..color       = const Color(0xFF00C896).withOpacity(0.07)
+      ..style       = PaintingStyle.stroke
       ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+      ..strokeCap   = StrokeCap.round
+      ..strokeJoin  = StrokeJoin.round;
 
     final hbPath = Path();
-    final hbY = size.height * 0.18;
-    final sx = size.width * 0.03;
+    final hbY    = size.height * 0.18;
+    final sx     = size.width * 0.03;
     hbPath.moveTo(sx, hbY);
-    hbPath.lineTo(sx + size.width * 0.1, hbY);
+    hbPath.lineTo(sx + size.width * 0.10, hbY);
     hbPath.lineTo(sx + size.width * 0.13, hbY - 20);
     hbPath.lineTo(sx + size.width * 0.16, hbY + 28);
     hbPath.lineTo(sx + size.width * 0.19, hbY - 14);
@@ -913,10 +1190,9 @@ class _HealthBgPainter extends CustomPainter {
     hbPath.lineTo(sx + size.width * 0.40, hbY);
     canvas.drawPath(hbPath, ecgPaint);
 
-    // Second ECG line — right side
     final hbPath2 = Path();
-    final hbY2 = size.height * 0.55;
-    final sx2 = size.width * 0.6;
+    final hbY2    = size.height * 0.55;
+    final sx2     = size.width * 0.6;
     hbPath2.moveTo(sx2, hbY2);
     hbPath2.lineTo(sx2 + size.width * 0.08, hbY2);
     hbPath2.lineTo(sx2 + size.width * 0.11, hbY2 - 16);
@@ -927,19 +1203,20 @@ class _HealthBgPainter extends CustomPainter {
     canvas.drawPath(
         hbPath2,
         ecgPaint
-          ..color = const Color(0xFF6C63FF).withOpacity(0.06));
+          ..color =
+              const Color(0xFF6C63FF).withOpacity(0.06));
 
-    // Medical crosses
     final crossPaint = Paint()
-      ..color = const Color(0xFF2196F3).withOpacity(0.07)
-      ..style = PaintingStyle.stroke
+      ..style       = PaintingStyle.stroke
       ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
+      ..strokeCap   = StrokeCap.round;
 
     void drawCross(double x, double y, double r, Color c) {
       crossPaint.color = c.withOpacity(0.07);
-      canvas.drawLine(Offset(x - r, y), Offset(x + r, y), crossPaint);
-      canvas.drawLine(Offset(x, y - r), Offset(x, y + r), crossPaint);
+      canvas.drawLine(
+          Offset(x - r, y), Offset(x + r, y), crossPaint);
+      canvas.drawLine(
+          Offset(x, y - r), Offset(x, y + r), crossPaint);
     }
 
     drawCross(size.width * 0.93, size.height * 0.28, 11,
@@ -951,73 +1228,78 @@ class _HealthBgPainter extends CustomPainter {
     drawCross(size.width * 0.12, size.height * 0.85, 9,
         const Color(0xFFFFB347));
 
-    // Subtle circles
     final circlePaint = Paint()
-      ..style = PaintingStyle.stroke
+      ..style       = PaintingStyle.stroke
       ..strokeWidth = 1;
-
-    circlePaint.color = const Color(0xFF6C63FF).withOpacity(0.06);
+    circlePaint.color =
+        const Color(0xFF6C63FF).withOpacity(0.06);
     canvas.drawCircle(
-        Offset(size.width * 0.92, size.height * 0.52), 42, circlePaint);
-
-    circlePaint.color = const Color(0xFF00C896).withOpacity(0.05);
+        Offset(size.width * 0.92, size.height * 0.52),
+        42, circlePaint);
+    circlePaint.color =
+        const Color(0xFF00C896).withOpacity(0.05);
     canvas.drawCircle(
-        Offset(size.width * 0.05, size.height * 0.22), 30, circlePaint);
-
-    circlePaint.color = const Color(0xFF2196F3).withOpacity(0.04);
+        Offset(size.width * 0.05, size.height * 0.22),
+        30, circlePaint);
+    circlePaint.color =
+        const Color(0xFF2196F3).withOpacity(0.04);
     canvas.drawCircle(
-        Offset(size.width * 0.5, size.height * 0.92), 55, circlePaint);
+        Offset(size.width * 0.5, size.height * 0.92),
+        55, circlePaint);
 
-    // DNA helix dots
     final dotPaint = Paint()..style = PaintingStyle.fill;
     for (int i = 0; i < 14; i++) {
-      final t = i / 13;
+      final t    = i / 13;
       final side = i % 2 == 0 ? 1 : -1;
-      final x = size.width * 0.96 + 10.0 * side;
-      final y = size.height * 0.32 + t * size.height * 0.35;
+      final x    = size.width * 0.96 + 10.0 * side;
+      final y    = size.height * 0.32 + t * size.height * 0.35;
       dotPaint.color =
           const Color(0xFF00C896).withOpacity(0.09 - t * 0.05);
       canvas.drawCircle(Offset(x, y), 2.5, dotPaint);
-      // connector line
       if (i < 13) {
         canvas.drawLine(
           Offset(x, y),
-          Offset(size.width * 0.96 + 10.0 * -side,
-              size.height * 0.32 + (i + 1) / 13 * size.height * 0.35),
+          Offset(
+              size.width * 0.96 + 10.0 * -side,
+              size.height * 0.32 +
+                  (i + 1) / 13 * size.height * 0.35),
           Paint()
-            ..color = const Color(0xFF00C896).withOpacity(0.04)
+            ..color       =
+                const Color(0xFF00C896).withOpacity(0.04)
             ..strokeWidth = 0.8,
         );
       }
     }
 
-    // Heart outline — bottom right
     final heartPaint = Paint()
-      ..color = const Color(0xFFFF6B6B).withOpacity(0.06)
-      ..style = PaintingStyle.stroke
+      ..color       = const Color(0xFFFF6B6B).withOpacity(0.06)
+      ..style       = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-    final hx = size.width * 0.87;
-    final hy = size.height * 0.83;
-    const hs = 24.0;
+    final hx       = size.width * 0.87;
+    final hy       = size.height * 0.83;
+    const hs       = 24.0;
     final heartPath = Path();
     heartPath.moveTo(hx, hy + hs * 0.35);
-    heartPath.cubicTo(hx, hy, hx - hs, hy, hx - hs, hy - hs * 0.3);
     heartPath.cubicTo(
-        hx - hs, hy - hs * 0.85, hx, hy - hs * 0.8, hx, hy - hs * 0.3);
+        hx, hy, hx - hs, hy, hx - hs, hy - hs * 0.3);
     heartPath.cubicTo(
-        hx, hy - hs * 0.8, hx + hs, hy - hs * 0.85, hx + hs, hy - hs * 0.3);
+        hx - hs, hy - hs * 0.85, hx, hy - hs * 0.8,
+        hx, hy - hs * 0.3);
+    heartPath.cubicTo(
+        hx, hy - hs * 0.8, hx + hs, hy - hs * 0.85,
+        hx + hs, hy - hs * 0.3);
     heartPath.cubicTo(hx + hs, hy, hx, hy, hx, hy + hs * 0.35);
     canvas.drawPath(heartPath, heartPaint);
 
-    // Pill shape — top left
     final pillPaint = Paint()
-      ..color = const Color(0xFFFFB347).withOpacity(0.06)
-      ..style = PaintingStyle.stroke
+      ..color       = const Color(0xFFFFB347).withOpacity(0.06)
+      ..style       = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     final pillRect = RRect.fromRectAndRadius(
       Rect.fromCenter(
-          center: Offset(size.width * 0.08, size.height * 0.35),
-          width: 14,
+          center: Offset(
+              size.width * 0.08, size.height * 0.35),
+          width:  14,
           height: 30),
       const Radius.circular(7),
     );
@@ -1030,14 +1312,15 @@ class _HealthBgPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
+      false;
 }
 
 // ─── Profile Info Row ──────────────────────────────────────
 class _ProfileInfoRow extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String value;
+  final String   label;
+  final String   value;
 
   const _ProfileInfoRow({
     required this.icon,
@@ -1048,12 +1331,13 @@ class _ProfileInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E2535),
+        color:        const Color(0xFF1E2535),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E2A42)),
+        border:
+            Border.all(color: const Color(0xFF1E2A42)),
       ),
       child: Row(children: [
         Container(
@@ -1071,12 +1355,12 @@ class _ProfileInfoRow extends StatelessWidget {
           children: [
             Text(label,
                 style: GoogleFonts.poppins(
-                    color: const Color(0xFF8B9EC7),
+                    color:    const Color(0xFF8B9EC7),
                     fontSize: 11)),
             Text(value,
                 style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 13,
+                    color:      Colors.white,
+                    fontSize:   13,
                     fontWeight: FontWeight.w500)),
           ],
         ),
@@ -1087,11 +1371,11 @@ class _ProfileInfoRow extends StatelessWidget {
 
 // ─── Quick Action Card ─────────────────────────────────────
 class _QuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final String emoji;
-  final Color color;
+  final IconData   icon;
+  final String     label;
+  final String     subtitle;
+  final String     emoji;
+  final Color      color;
   final VoidCallback onTap;
 
   const _QuickAction({
@@ -1119,9 +1403,9 @@ class _QuickAction extends StatelessWidget {
               color.withOpacity(0.04),
               const Color(0xFF161B27),
             ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: const [0.0, 0.4, 1.0],
+            begin:  Alignment.topLeft,
+            end:    Alignment.bottomRight,
+            stops:  const [0.0, 0.4, 1.0],
           ),
         ),
         child: Row(
@@ -1145,12 +1429,12 @@ class _QuickAction extends StatelessWidget {
                 children: [
                   Text(label,
                       style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 13,
+                          color:      Colors.white,
+                          fontSize:   13,
                           fontWeight: FontWeight.w700)),
                   Text(subtitle,
                       style: GoogleFonts.poppins(
-                          color: const Color(0xFF8B9EC7),
+                          color:    const Color(0xFF8B9EC7),
                           fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
@@ -1160,7 +1444,7 @@ class _QuickAction extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color:        color.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(Icons.arrow_forward_ios_rounded,
@@ -1177,26 +1461,28 @@ class _QuickAction extends StatelessWidget {
 class _EmptyCard extends StatelessWidget {
   final String icon;
   final String message;
-
-  const _EmptyCard({required this.icon, required this.message});
+  const _EmptyCard(
+      {required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B27),
+        color:        const Color(0xFF161B27),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF1E2A42)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(icon, style: const TextStyle(fontSize: 20)),
+          Text(icon,
+              style: const TextStyle(fontSize: 20)),
           const SizedBox(width: 10),
           Text(message,
               style: GoogleFonts.poppins(
-                  color: const Color(0xFF8B9EC7), fontSize: 14)),
+                  color:    const Color(0xFF8B9EC7),
+                  fontSize: 14)),
         ],
       ),
     );
@@ -1206,7 +1492,7 @@ class _EmptyCard extends StatelessWidget {
 // ─── Appointment Card ──────────────────────────────────────
 class _AppointmentCard extends StatelessWidget {
   final Map<String, dynamic> data;
-  final String docId;
+  final String               docId;
   const _AppointmentCard(
       {required this.data, required this.docId});
 
@@ -1220,10 +1506,10 @@ class _AppointmentCard extends StatelessWidget {
       statusColor = const Color(0xFF8B9EC7);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin:  const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF161B27),
+        color:        const Color(0xFF161B27),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFF1E2A42)),
       ),
@@ -1235,8 +1521,10 @@ class _AppointmentCard extends StatelessWidget {
               color: const Color(0xFF00C896).withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.medical_services_outlined,
-                color: Color(0xFF00C896), size: 22),
+            child: const Icon(
+                Icons.medical_services_outlined,
+                color: Color(0xFF00C896),
+                size:  22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1245,12 +1533,12 @@ class _AppointmentCard extends StatelessWidget {
               children: [
                 Text(data['doctorName'] ?? 'Doctor',
                     style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 14,
+                        color:      Colors.white,
+                        fontSize:   14,
                         fontWeight: FontWeight.w600)),
                 Text(data['specialty'] ?? '',
                     style: GoogleFonts.poppins(
-                        color: const Color(0xFF8B9EC7),
+                        color:    const Color(0xFF8B9EC7),
                         fontSize: 12)),
               ],
             ),
@@ -1259,13 +1547,13 @@ class _AppointmentCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(
                 horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.15),
+              color:        statusColor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(status,
                 style: GoogleFonts.poppins(
-                    color: statusColor,
-                    fontSize: 11,
+                    color:      statusColor,
+                    fontSize:   11,
                     fontWeight: FontWeight.w600)),
           ),
         ],

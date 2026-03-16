@@ -203,7 +203,7 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
           final completed = docs
               .where((d) =>
                   (d.data() as Map)['status'] == 'completed')
-              .length;S
+              .length;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
