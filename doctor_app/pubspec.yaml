@@ -1,0 +1,51 @@
+name: doctor_app
+description: HealthCare Pro - Doctor Application
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Firebase
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.0
+  cloud_firestore: ^4.15.0
+  firebase_messaging: ^14.7.20
+  # Video Call
+  
+  # UI & Utils
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1
+  intl: ^0.19.0
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  flutter_animate: ^4.5.0
+  uuid: ^4.3.3
+  url_launcher: ^6.3.2
+  shared_preferences: ^2.2.3
+  flutter_local_notifications: ^17.1.2
+  permission_handler: ^11.3.1
+  flutter_launcher_icons: ^0.14.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/animations/
+    - assets/icon/
+
+flutter_launcher_icons:
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#0D1117"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
