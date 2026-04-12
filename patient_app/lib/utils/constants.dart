@@ -1,7 +1,7 @@
 class AppConstants {
   // ─── Gemini ───────────────────────────────────────────────
-  static const String geminiApiKey = 'AIzaSyCFxCdbstf9tfrErWlnX8LUc2Ttk-TIr48'; // 🔑 Replace this
-  static const String geminiModel = 'gemini-2.5-flash-lite';
+  static const String geminiApiKey = 'AIzaSyA7lBRdjrQskp80JVvPV-aVLVKhAO10j4A'; // 🔑 Replace this
+  static const String geminiModel = 'gemini-3.1-flash-lite-preview';
 
   // ─── Jitsi ────────────────────────────────────────────────
   static const String jitsiServerUrl = 'https://meet.jit.si';

@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import 'dart:async';
 import '../services/firebase_service.dart';
+import '../utils/language_provider.dart';
+import '../widgets/language_toggle.dart';
 import 'chat_history_screen.dart';
 import 'doctors_screen.dart';
 import 'pharmacy_screen.dart';
@@ -94,6 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LanguageProvider>();
+
     return Scaffold(
       backgroundColor: _bg,
       body: Stack(
@@ -169,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 32),
                     Text(
-                      '🚨 Sending SOS...',
+                      lang.isTamil ? '🚨 SOS அனுப்புகிறோம்...' : '🚨 Sending SOS...',
                       style: GoogleFonts.poppins(
                         color:      _red,
                         fontSize:   22,
@@ -178,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Release to cancel',
+                      lang.isTamil ? 'விட்டுவிட ரத்து செய்யும்' : 'Release to cancel',
                       style: GoogleFonts.poppins(
                         color:    Colors.white54,
                         fontSize: 14,
@@ -198,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               BorderRadius.circular(30),
                         ),
                         child: Text(
-                          'Cancel',
+                          lang.t('cancel'),
                           style: GoogleFonts.poppins(
                             color:    Colors.white54,
                             fontSize: 14,
@@ -237,17 +242,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w600),
                 unselectedLabelStyle:
                     GoogleFonts.poppins(fontSize: 11),
-                items: const [
+                items: [
                   BottomNavigationBarItem(
-                      icon: Icon(Icons.home_outlined),
-                      activeIcon: Icon(Icons.home_rounded),
-                      label: 'Home'),
+                      icon: const Icon(Icons.home_outlined),
+                      activeIcon: const Icon(Icons.home_rounded),
+                      label: lang.isTamil ? 'முகப்பு' : 'Home'),
                   BottomNavigationBarItem(
-                      icon: Icon(
-                          Icons.medical_services_outlined),
-                      activeIcon: Icon(
-                          Icons.medical_services_rounded),
-                      label: 'Doctors'),
+                      icon: const Icon(Icons.medical_services_outlined),
+                      activeIcon: const Icon(Icons.medical_services_rounded),
+                      label: lang.isTamil ? 'மருத்துவர்' : 'Doctors'),
                 ],
               ),
             ),
@@ -313,18 +316,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w600),
                 unselectedLabelStyle:
                     GoogleFonts.poppins(fontSize: 11),
-                items: const [
+                items: [
                   BottomNavigationBarItem(
-                      icon: Icon(
-                          Icons.local_pharmacy_outlined),
-                      activeIcon: Icon(
-                          Icons.local_pharmacy_rounded),
-                      label: 'Pharmacy'),
+                      icon: const Icon(Icons.local_pharmacy_outlined),
+                      activeIcon: const Icon(Icons.local_pharmacy_rounded),
+                      label: lang.isTamil ? 'மருந்தகம்' : 'Pharmacy'),
                   BottomNavigationBarItem(
-                      icon: Icon(Icons.folder_outlined),
-                      activeIcon:
-                          Icon(Icons.folder_rounded),
-                      label: 'Records'),
+                      icon: const Icon(Icons.folder_outlined),
+                      activeIcon: const Icon(Icons.folder_rounded),
+                      label: lang.isTamil ? 'பதிவுகள்' : 'Records'),
                 ],
               ),
             ),
@@ -348,7 +348,7 @@ class _HomeTabState extends State<_HomeTab> {
   late final Stream<QuerySnapshot> _labStream;
   late final Stream<QuerySnapshot> _requestsStream;
 
-  final List<Map<String, dynamic>> _healthFacts = [
+  final List<Map<String, dynamic>> _healthFactsEn = [
     {
       'icon':  '💧',
       'fact':  'Drink 8 glasses of water daily to stay hydrated and boost energy.',
@@ -386,6 +386,44 @@ class _HomeTabState extends State<_HomeTab> {
     },
   ];
 
+  final List<Map<String, dynamic>> _healthFactsTa = [
+    {
+      'icon':  '💧',
+      'fact':  'தினமும் 8 கிளாஸ் தண்ணீர் குடிப்பது உடலை சுறுசுறுப்பாக வைக்கும்.',
+      'color': Color(0xFF2196F3),
+    },
+    {
+      'icon':  '🏃',
+      'fact':  'தினமும் 30 நிமிட நடைப்பயிற்சி இதய நோய் அபாயத்தை 35% குறைக்கும்.',
+      'color': Color(0xFF00C896),
+    },
+    {
+      'icon':  '😴',
+      'fact':  '7-9 மணி நேர தூக்கம் உங்கள் நோய் எதிர்ப்பு சக்தியை வலுப்படுத்தும்.',
+      'color': Color(0xFF6C63FF),
+    },
+    {
+      'icon':  '🥦',
+      'fact':  'வண்ணமயமான காய்கறிகள் சாப்பிடுவது அத்தியாவசிய ஆன்டிஆக்ஸிடன்ட்களை வழங்கும்.',
+      'color': Color(0xFF4CAF50),
+    },
+    {
+      'icon':  '🧘',
+      'fact':  'தினமும் 10 நிமிட தியானம் மன அழுத்தத்தை 40% குறைக்கும்.',
+      'color': Color(0xFFFFB347),
+    },
+    {
+      'icon':  '❤️',
+      'fact':  'தினமும் 15 நிமிடம் சிரிப்பது இரத்த ஓட்டத்தை மேம்படுத்தும்.',
+      'color': Color(0xFFFF6B6B),
+    },
+    {
+      'icon':  '🌞',
+      'fact':  'காலை 15 நிமிட வெயில் விட்டமின் D மற்றும் மனநிலையை மேம்படுத்தும்.',
+      'color': Color(0xFFFFD700),
+    },
+  ];
+
   int    _factIndex   = 0;
   double _factOpacity = 1.0;
   Timer? _factTimer;
@@ -411,7 +449,7 @@ class _HomeTabState extends State<_HomeTab> {
       setState(() => _factOpacity = 0.0);
       await Future.delayed(const Duration(milliseconds: 400));
       setState(
-          () => _factIndex = (_factIndex + 1) % _healthFacts.length);
+          () => _factIndex = (_factIndex + 1) % _healthFactsEn.length);
       setState(() => _factOpacity = 1.0);
     });
   }
@@ -423,7 +461,8 @@ class _HomeTabState extends State<_HomeTab> {
   }
 
   void _showProfilePopup(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final lang  = context.read<LanguageProvider>();
+    final user  = FirebaseAuth.instance.currentUser;
     final name  = user?.displayName ?? 'Patient';
     final email = user?.email ?? '';
 
@@ -510,7 +549,7 @@ class _HomeTabState extends State<_HomeTab> {
                   Icon(Icons.verified_user_rounded,
                       color: _primary, size: 14),
                   const SizedBox(width: 6),
-                  Text('Patient',
+                  Text(lang.isTamil ? 'நோயாளி' : 'Patient',
                       style: GoogleFonts.poppins(
                           color:      _primary,
                           fontSize:   12,
@@ -518,21 +557,24 @@ class _HomeTabState extends State<_HomeTab> {
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 16),
+            // ── Language toggle inside profile ──
+            const LanguageToggle(),
+            const SizedBox(height: 12),
             _ProfileInfoRow(
                 icon:  Icons.person_outline_rounded,
-                label: 'Full Name',
+                label: lang.isTamil ? 'முழு பெயர்' : 'Full Name',
                 value: name),
             const SizedBox(height: 12),
             _ProfileInfoRow(
                 icon:  Icons.email_outlined,
-                label: 'Email',
+                label: lang.isTamil ? 'மின்னஞ்சல்' : 'Email',
                 value: email),
             const SizedBox(height: 12),
             _ProfileInfoRow(
                 icon:  Icons.shield_outlined,
-                label: 'Account Type',
-                value: 'Patient Account'),
+                label: lang.isTamil ? 'கணக்கு வகை' : 'Account Type',
+                value: lang.isTamil ? 'நோயாளி கணக்கு' : 'Patient Account'),
             const SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
@@ -557,10 +599,11 @@ class _HomeTabState extends State<_HomeTab> {
                 },
                 icon: const Icon(Icons.logout_rounded,
                     size: 18),
-                label: Text('Log Out',
-                    style: GoogleFonts.poppins(
-                        fontSize:   15,
-                        fontWeight: FontWeight.w600)),
+                label: Text(
+                  lang.isTamil ? 'வெளியேறு' : 'Log Out',
+                  style: GoogleFonts.poppins(
+                      fontSize:   15,
+                      fontWeight: FontWeight.w600)),
               ),
             ),
             const SizedBox(height: 8),
@@ -572,9 +615,12 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    final lang  = context.watch<LanguageProvider>();
     final user  = FirebaseAuth.instance.currentUser;
     final name  = user?.displayName ?? 'Patient';
-    final currentFact = _healthFacts[_factIndex];
+    final currentFact = lang.isTamil
+        ? _healthFactsTa[_factIndex]
+        : _healthFactsEn[_factIndex];
 
     return Scaffold(
       backgroundColor: _bg,
@@ -600,18 +646,23 @@ class _HomeTabState extends State<_HomeTab> {
                         crossAxisAlignment:
                             CrossAxisAlignment.start,
                         children: [
-                          Text('Hello, $name 👋',
-                              style: GoogleFonts.poppins(
-                                  color:      Colors.white,
-                                  fontSize:   22,
-                                  fontWeight: FontWeight.w700)),
-                          Text('How are you feeling today?',
-                              style: GoogleFonts.poppins(
-                                  color:    _text2,
-                                  fontSize: 14)),
+                          Text(
+                            '${lang.t('hello')}, $name 👋',
+                            style: GoogleFonts.poppins(
+                                color:      Colors.white,
+                                fontSize:   22,
+                                fontWeight: FontWeight.w700)),
+                          Text(
+                            lang.t('how_feeling'),
+                            style: GoogleFonts.poppins(
+                                color:    _text2,
+                                fontSize: 14)),
                         ],
                       ),
                       const Spacer(),
+                      // ── Language toggle in header ──
+                      const LanguageToggle(),
+                      const SizedBox(width: 10),
                       GestureDetector(
                         onTap: () =>
                             _showProfilePopup(context),
@@ -716,18 +767,16 @@ class _HomeTabState extends State<_HomeTab> {
                               crossAxisAlignment:
                                   CrossAxisAlignment.start,
                               children: [
-                                Text('Health Tip 💡',
-                                    style: GoogleFonts.poppins(
-                                        color: currentFact[
-                                            'color'] as Color,
-                                        fontSize:    11,
-                                        fontWeight:
-                                            FontWeight.w600,
-                                        letterSpacing: 0.5)),
+                                Text(
+                                  lang.isTamil ? 'உடல்நல குறிப்பு 💡' : 'Health Tip 💡',
+                                  style: GoogleFonts.poppins(
+                                      color: currentFact['color'] as Color,
+                                      fontSize:    11,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.5)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  currentFact['fact']
-                                      as String,
+                                  currentFact['fact'] as String,
                                   style: GoogleFonts.poppins(
                                       color:      Colors.white,
                                       fontSize:   13,
@@ -792,7 +841,9 @@ class _HomeTabState extends State<_HomeTab> {
                                     CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '$count Doctor Request${count > 1 ? 's' : ''} Pending',
+                                    lang.isTamil
+                                        ? '$count மருத்துவர் கோரிக்கை நிலுவையில்'
+                                        : '$count Doctor Request${count > 1 ? 's' : ''} Pending',
                                     style: GoogleFonts.poppins(
                                         color: Colors.white,
                                         fontSize:   14,
@@ -800,10 +851,10 @@ class _HomeTabState extends State<_HomeTab> {
                                             FontWeight.w700),
                                   ),
                                   Text(
-                                      'Tap to view & confirm',
-                                      style: GoogleFonts.poppins(
-                                          color:    _text2,
-                                          fontSize: 12)),
+                                    lang.isTamil ? 'காண தட்டவும்' : 'Tap to view & confirm',
+                                    style: GoogleFonts.poppins(
+                                        color:    _text2,
+                                        fontSize: 12)),
                                 ],
                               ),
                             ),
@@ -817,7 +868,7 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
 
                   // ── Quick Actions ────────────────
-                  Text('Quick Actions',
+                  Text(lang.t('quick_actions'),
                       style: GoogleFonts.poppins(
                           color:      Colors.white,
                           fontSize:   16,
@@ -829,8 +880,8 @@ class _HomeTabState extends State<_HomeTab> {
                         Expanded(
                           child: _QuickAction(
                             icon:     Icons.smart_toy_outlined,
-                            label:    'MediBot',
-                            subtitle: 'AI Symptom Checker',
+                            label:    lang.t('medibot'),
+                            subtitle: lang.t('medibot_sub'),
                             color:    const Color(0xFF6C63FF),
                             emoji:    '🤖',
                             onTap: () => Navigator.push(
@@ -844,8 +895,8 @@ class _HomeTabState extends State<_HomeTab> {
                         Expanded(
                           child: _QuickAction(
                             icon: Icons.medical_services_outlined,
-                            label:    'Find Doctor',
-                            subtitle: 'Book appointment',
+                            label:    lang.t('find_doctor'),
+                            subtitle: lang.t('find_doctor_sub'),
                             color:    const Color(0xFF00C896),
                             emoji:    '👨‍⚕️',
                             onTap: () => Navigator.push(
@@ -862,8 +913,8 @@ class _HomeTabState extends State<_HomeTab> {
                           child: _QuickAction(
                             icon:
                                 Icons.local_pharmacy_outlined,
-                            label:    'Pharmacy',
-                            subtitle: 'Order medicines',
+                            label:    lang.t('pharmacy'),
+                            subtitle: lang.t('pharmacy_sub'),
                             color:    const Color(0xFFFF6B6B),
                             emoji:    '💊',
                             onTap: () => Navigator.push(
@@ -877,8 +928,8 @@ class _HomeTabState extends State<_HomeTab> {
                         Expanded(
                           child: _QuickAction(
                             icon:     Icons.science_outlined,
-                            label:    'Lab Tests',
-                            subtitle: 'Book a test',
+                            label:    lang.t('lab_tests'),
+                            subtitle: lang.t('lab_tests_sub'),
                             color:    const Color(0xFFFFB347),
                             emoji:    '🧪',
                             onTap: () => Navigator.push(
@@ -895,8 +946,8 @@ class _HomeTabState extends State<_HomeTab> {
                           child: _QuickAction(
                             icon:
                                 Icons.calendar_today_outlined,
-                            label:    'Appointments',
-                            subtitle: 'My bookings',
+                            label:    lang.t('appointments'),
+                            subtitle: lang.t('appointments_sub'),
                             color:    const Color(0xFF2196F3),
                             emoji:    '📅',
                             onTap: () => Navigator.push(
@@ -910,8 +961,8 @@ class _HomeTabState extends State<_HomeTab> {
                         Expanded(
                           child: _QuickAction(
                             icon:     Icons.folder_outlined,
-                            label:    'Records',
-                            subtitle: 'Health history',
+                            label:    lang.t('records'),
+                            subtitle: lang.t('records_sub'),
                             color:    const Color(0xFF00BCD4),
                             emoji:    '📋',
                             onTap: () => Navigator.push(
@@ -931,7 +982,7 @@ class _HomeTabState extends State<_HomeTab> {
                     mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('My Appointments',
+                      Text(lang.t('my_appointments'),
                           style: GoogleFonts.poppins(
                               color:      Colors.white,
                               fontSize:   16,
@@ -942,7 +993,7 @@ class _HomeTabState extends State<_HomeTab> {
                             MaterialPageRoute(
                                 builder: (_) => const
                                     AppointmentsScreen())),
-                        child: Text('View All',
+                        child: Text(lang.t('view_all'),
                             style: GoogleFonts.poppins(
                                 color:    _primary,
                                 fontSize: 13)),
@@ -957,7 +1008,7 @@ class _HomeTabState extends State<_HomeTab> {
                           snapshot.data!.docs.isEmpty) {
                         return _EmptyCard(
                             icon:    '📅',
-                            message: 'No appointments yet');
+                            message: lang.t('no_appointments'));
                       }
                       final docs =
                           snapshot.data!.docs.toList()
@@ -988,21 +1039,23 @@ class _HomeTabState extends State<_HomeTab> {
                     mainAxisAlignment:
                         MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('My Lab Tests',
-                          style: GoogleFonts.poppins(
-                              color:      Colors.white,
-                              fontSize:   16,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        lang.isTamil ? 'என் ஆய்வக சோதனைகள்' : 'My Lab Tests',
+                        style: GoogleFonts.poppins(
+                            color:      Colors.white,
+                            fontSize:   16,
+                            fontWeight: FontWeight.w600)),
                       TextButton(
                         onPressed: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                                 builder: (_) =>
                                     const LabTestScreen())),
-                        child: Text('Book New',
-                            style: GoogleFonts.poppins(
-                                color:    _primary,
-                                fontSize: 13)),
+                        child: Text(
+                          lang.isTamil ? 'புதிதாக பதிவு செய்' : 'Book New',
+                          style: GoogleFonts.poppins(
+                              color:    _primary,
+                              fontSize: 13)),
                       ),
                     ],
                   ),
@@ -1014,7 +1067,9 @@ class _HomeTabState extends State<_HomeTab> {
                           snapshot.data!.docs.isEmpty) {
                         return _EmptyCard(
                             icon:    '🧪',
-                            message: 'No lab tests booked yet');
+                            message: lang.isTamil
+                                ? 'இன்னும் ஆய்வக சோதனைகள் இல்லை'
+                                : 'No lab tests booked yet');
                       }
                       final docs =
                           snapshot.data!.docs.toList()

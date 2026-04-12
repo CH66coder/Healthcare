@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
@@ -8,6 +9,7 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.SEND_SMS"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
     <application
         android:label="HealthCare Pro"
@@ -16,11 +18,32 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
+        <!-- ── SOS Widget ────────────────────────────── -->
+        <receiver
+            android:name=".SosWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/sos_widget_info" />
+        </receiver>
+
+        <!-- ── SOS Trampoline Activity ───────────────── -->
+        <activity
+            android:name=".SosTrampolineActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:taskAffinity=""
+            android:excludeFromRecents="true" />
+
         <!-- ── Google Maps API Key ───────────────────── -->
         <meta-data
-    android:name="com.google.android.geo.API_KEY"
-    android:value="AIzaSyD253tRmBFax_-nY37Obo9wlPEvzZ2mIwA"/>
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyD253tRmBFax_-nY37Obo9wlPEvzZ2mIwA"/>
 
+        <!-- ── Main Activity ─────────────────────────── -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -42,6 +65,7 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
+
     </application>
 
     <queries>
