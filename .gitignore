@@ -1,4 +1,6 @@
 venv/
 .vscode/
 build/
-*.log
+*.logvenv/
+.vscode/
+build/
