@@ -1,0 +1,5 @@
+class FirebaseCollections {
+  static const String sosRequests  = 'sos_requests';
+  static const String driverTokens = 'driver_tokens';
+  static const String users        = 'users';
+}
